@@ -2,15 +2,19 @@
 "use client";
 import { useState } from "react";
 import { supabase } from "@/utils/supabaseClient";
-import { Upload, Save, Image as ImageIcon, ArrowLeft } from "lucide-react";
+import { Upload, Save, Image as ImageIcon, ArrowLeft, Lock, Key } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function AdminPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
 
-  // State untuk Form
+  // --- STATE UNTUK SECURITY ---
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+
+  // --- STATE UNTUK FORM ---
+  const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState("");
   const [promptText, setPromptText] = useState("");
   const [category, setCategory] = useState("Realistic");
@@ -18,7 +22,20 @@ export default function AdminPage() {
   const [imageFile, setImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
 
-  // Handle Gambar dipilih
+  // --- PASSWORD RAHASIA (GANTI DISINI!) ---
+  const SECRET_CODE = "Apapunitu2026"; // <--- Ganti password sesuka hati
+
+  // Fungsi Login Sederhana
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (passwordInput === SECRET_CODE) {
+      setIsAuthenticated(true); // Pintu terbuka!
+    } else {
+      alert("Password salah! Anda siapa?");
+    }
+  };
+
+  // Handle Gambar
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -27,7 +44,7 @@ export default function AdminPage() {
     }
   };
 
-  // Logic Upload ke Supabase (The Magic)
+  // Logic Upload (Sama seperti sebelumnya)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!title || !promptText || !imageFile) {
@@ -38,20 +55,17 @@ export default function AdminPage() {
     setLoading(true);
 
     try {
-      // 1. Upload Gambar ke Storage
       const fileExt = imageFile.name.split(".").pop();
-      const fileName = `${Date.now()}.${fileExt}`; // Nama file unik
+      const fileName = `${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from("images").upload(fileName, imageFile);
 
       if (uploadError) throw uploadError;
 
-      // 2. Ambil Public URL gambarnya
       const {
         data: { publicUrl },
       } = supabase.storage.from("images").getPublicUrl(fileName);
 
-      // 3. Masukkan Data ke Database
-      const tagArray = tags.split(",").map((tag) => tag.trim()); // Ubah "kucing, lucu" jadi ['kucing', 'lucu']
+      const tagArray = tags.split(",").map((tag) => tag.trim());
 
       const { error: insertError } = await supabase.from("prompts").insert([
         {
@@ -66,7 +80,7 @@ export default function AdminPage() {
       if (insertError) throw insertError;
 
       alert("Sukses! Prompt berhasil ditambahkan.");
-      router.push("/"); // Kembali ke halaman utama
+      router.push("/");
     } catch (error) {
       console.error(error);
       alert("Gagal upload: " + error.message);
@@ -75,6 +89,41 @@ export default function AdminPage() {
     }
   };
 
+  // --- TAMPILAN 1: KALAU BELUM LOGIN ---
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full text-center">
+          <div className="bg-red-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Lock className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Restricted Area</h2>
+          <p className="text-slate-400 mb-6">Hanya Sultan yang boleh masuk sini.</p>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="relative">
+              <Key className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
+              <input
+                type="password"
+                placeholder="Masukkan Password..."
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg py-3 pl-10 pr-4 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+              />
+            </div>
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-all">
+              Buka Gembok
+            </button>
+            <Link href="/" className="block text-slate-500 text-sm hover:text-white mt-4">
+              Kembali ke Halaman Depan
+            </Link>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // --- TAMPILAN 2: FORM ADMIN (KALAU SUDAH LOGIN) ---
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 p-6 md:p-12 font-sans">
       <div className="max-w-2xl mx-auto">
@@ -82,16 +131,16 @@ export default function AdminPage() {
           <ArrowLeft className="w-4 h-4 mr-2" /> Kembali ke Galeri
         </Link>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl animate-in fade-in zoom-in duration-300">
           <h1 className="text-3xl font-bold mb-6 text-white flex items-center gap-2">
-            <span className="bg-blue-600 p-2 rounded-lg">
+            <span className="bg-green-600 p-2 rounded-lg">
               <Upload className="w-6 h-6" />
             </span>
             Upload Prompt Baru
           </h1>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Input Judul */}
+            {/* --- Form Input Area --- */}
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-2">Judul Gambar</label>
               <input
@@ -103,7 +152,6 @@ export default function AdminPage() {
               />
             </div>
 
-            {/* Input Kategori & Tags */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-2">Kategori</label>
@@ -127,7 +175,6 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Input Prompt */}
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-2">Prompt Asli</label>
               <textarea
@@ -139,7 +186,6 @@ export default function AdminPage() {
               />
             </div>
 
-            {/* Upload Image Area */}
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-2">Upload Gambar Hasil</label>
               <div className="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center hover:bg-slate-800/50 transition-colors relative">
@@ -155,7 +201,6 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
